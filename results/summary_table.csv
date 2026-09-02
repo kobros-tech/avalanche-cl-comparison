@@ -7,7 +7,7 @@ GDumb,replay,100.0%,0.0%
 Replay,replay,99.6%,0.5%
 GEM,replay,99.4%,0.7%
 CWR*,architectural,99.2%,0.0%
-A-GEM,replay,35.0%,79.8%
+A-GEM,replay,34.6%,80.4%
 SynapticIntelligence,regularization,34.4%,80.6%
 Naive,baseline,30.6%,85.7%
 EWC,regularization,26.6%,91.0%
