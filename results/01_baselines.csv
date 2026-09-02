@@ -1,0 +1,12 @@
+strategy,category,after_experience,stream_acc,stream_forgetting
+Naive,baseline,0,0.218,0.0
+Naive,baseline,1,0.302,0.47706422018348627
+Naive,baseline,2,0.396,0.5
+Naive,baseline,3,0.254,0.8942307692307692
+Naive,baseline,4,0.306,0.8574058919803601
+Cumulative,baseline,0,0.218,0.0
+Cumulative,baseline,1,0.406,0.0
+Cumulative,baseline,2,0.614,0.0
+Cumulative,baseline,3,0.802,0.0
+Cumulative,baseline,4,1.0,0.0
+JointTraining,baseline,4,1.0,0.0

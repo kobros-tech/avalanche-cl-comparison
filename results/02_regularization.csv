@@ -1,0 +1,16 @@
+strategy,category,after_experience,stream_acc,stream_forgetting
+EWC,regularization,0,0.218,0.0
+EWC,regularization,1,0.3,0.4862385321100917
+EWC,regularization,2,0.39,0.5159574468085106
+EWC,regularization,3,0.212,0.9615384615384616
+EWC,regularization,4,0.266,0.9095744680851063
+SynapticIntelligence,regularization,0,0.218,0.0
+SynapticIntelligence,regularization,1,0.302,0.47706422018348627
+SynapticIntelligence,regularization,2,0.39,0.5159574468085106
+SynapticIntelligence,regularization,3,0.31,0.8044871794871794
+SynapticIntelligence,regularization,4,0.344,0.8058510638297872
+LwF,regularization,0,0.218,0.0
+LwF,regularization,1,0.288,0.5412844036697247
+LwF,regularization,2,0.234,0.9308510638297872
+LwF,regularization,3,0.198,0.9839743589743589
+LwF,regularization,4,0.208,0.9867021276595744

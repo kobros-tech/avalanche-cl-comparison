@@ -1,0 +1,6 @@
+strategy,category,after_experience,stream_acc,stream_forgetting
+CWR*,architectural,0,0.218,0.0
+CWR*,architectural,1,0.406,0.0
+CWR*,architectural,2,0.61,0.0
+CWR*,architectural,3,0.798,0.0
+CWR*,architectural,4,0.992,0.0

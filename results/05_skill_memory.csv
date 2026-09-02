@@ -1,0 +1,2 @@
+strategy,category,after_experience,stream_acc,stream_forgetting,n_skills_stored,decisions
+SkillMemory,skill-memory (demo),4,1.0,0.0,5,"['SCRATCH', 'SCRATCH', 'SCRATCH', 'SCRATCH', 'SCRATCH']"
