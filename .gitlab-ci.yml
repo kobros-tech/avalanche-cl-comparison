@@ -1,0 +1,93 @@
+stages:
+  - benchmark
+  - collect
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  OCL_SURVEY_COMMIT: "a0ecf4eb537bbe704598f1f423a52d0ca9d48a0f"
+
+cache:
+  paths:
+    - .cache/pip
+
+benchmark:
+  stage: benchmark
+  image: python:3.11
+  timeout: 6h
+  parallel:
+    matrix:
+      - STRATEGY: [er, er_ace, der, mir, er_lwf, rar, scr, agem, mer, icarl, gdumb, skill_memory]
+        SEED: [0, 1, 2, 3, 4]
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq git
+    - python --version
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements.txt
+    - git clone --no-checkout https://github.com/kobros-tech/ocl_survey.git ocl_survey
+    - cd ocl_survey
+    - git checkout "$OCL_SURVEY_COMMIT"
+    - cd "$CI_PROJECT_DIR"
+    - python -m pip install -r ocl_survey/requirements.txt
+  script:
+    - |
+      set -euo pipefail
+
+      result_dir="results/${STRATEGY}_split_cifar100/${SEED}"
+      mkdir -p "$result_dir"
+
+      if [ "$STRATEGY" = "skill_memory" ]; then
+        PYTHONPATH="$CI_PROJECT_DIR:$CI_PROJECT_DIR/ocl_survey" \
+          python experiments/run_skill_memory_scientific.py \
+            --seed "$SEED" \
+            --ocl-root ocl_survey \
+            --output "$result_dir"
+      else
+        (
+          cd ocl_survey
+          PYTHONPATH="$CI_PROJECT_DIR/ocl_survey" \
+            python -m experiments.main \
+              strategy="$STRATEGY" \
+              experiment=split_cifar100 \
+              experiment.seed="$SEED" \
+              strategy.device=auto
+        )
+
+        source_dir=$(find ocl_survey/results -maxdepth 2 -type d -name "${STRATEGY}_split_cifar100*" | head -n 1)
+        test -n "$source_dir"
+        cp -a "$source_dir/$SEED/." "$result_dir/"
+      fi
+  after_script:
+    - |
+      result_dir="results/${STRATEGY}_split_cifar100/${SEED}"
+      mkdir -p "$result_dir"
+      {
+        echo "comparison_commit=$CI_COMMIT_SHA"
+        echo "ocl_survey_commit=$OCL_SURVEY_COMMIT"
+        echo "strategy=$STRATEGY"
+        echo "seed=$SEED"
+        echo "python=$(python --version 2>&1)"
+      } > "$result_dir/provenance.txt"
+  artifacts:
+    when: always
+    name: "scientific-${STRATEGY}-seed-${SEED}"
+    paths:
+      - "results/${STRATEGY}_split_cifar100/${SEED}/"
+    expire_in: 30 days
+
+collect:
+  stage: collect
+  image: alpine:3.20
+  timeout: 30m
+  when: always
+  script:
+    - |
+      set -euo pipefail
+      mkdir -p results
+      find results -maxdepth 3 -type f -print
+  artifacts:
+    when: always
+    name: scientific-comparison-results
+    paths:
+      - results/
+    expire_in: 30 days
