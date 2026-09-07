@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kobros-tech/ocl_survey
-          ref: a0ecf4eb537bbe704598f1f423a52d0ca9d48a0f
+          ref: 33dd65fedbbd8514d43ae03beb698221aef2f16f
           path: ocl_survey
           fetch-depth: 1
 
@@ -84,7 +84,7 @@ jobs:
           mkdir -p "results/${{ matrix.strategy }}_split_cifar100/${{ matrix.seed }}"
           {
             echo "comparison_commit=$(git rev-parse HEAD)"
-            echo "ocl_survey_commit=a0ecf4eb537bbe704598f1f423a52d0ca9d48a0f"
+            echo "ocl_survey_commit=33dd65fedbbd8514d43ae03beb698221aef2f16f"
             echo "strategy=${{ matrix.strategy }}"
             echo "seed=${{ matrix.seed }}"
             echo "python=$(python --version)"
