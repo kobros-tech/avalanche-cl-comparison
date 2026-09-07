@@ -2,9 +2,6 @@ name: Scientific CL Strategy Comparison
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/skill-memory-updated-plugin
 
 permissions:
   contents: read
@@ -101,7 +98,7 @@ jobs:
 
   collect:
     name: Consolidate scientific results
-    if: always()
+    if: ${{ needs.benchmark.result == 'success' }}
     needs: benchmark
     runs-on: ubuntu-latest
     steps:
