@@ -9,7 +9,7 @@ stages:
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  OCL_SURVEY_COMMIT: "a0ecf4eb537bbe704598f1f423a52d0ca9d48a0f"
+  OCL_SURVEY_COMMIT: "33dd65fedbbd8514d43ae03beb698221aef2f16f"
 
 cache:
   paths:
