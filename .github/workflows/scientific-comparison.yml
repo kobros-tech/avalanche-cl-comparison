@@ -1,0 +1,130 @@
+name: Scientific CL Strategy Comparison
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: ${{ matrix.strategy }} seed ${{ matrix.seed }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        strategy: [er, er_ace, der, mir, er_lwf, rar, scr, agem, mer, icarl, gdumb, skill_memory]
+        seed: [0, 1, 2, 3, 4]
+
+    steps:
+      - name: Check out comparison repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Check out OCL Survey reference implementation
+        uses: actions/checkout@v4
+        with:
+          repository: kobros-tech/ocl_survey
+          ref: 33dd65fedbbd8514d43ae03beb698221aef2f16f
+          path: ocl_survey
+          fetch-depth: 1
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install comparison dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Install OCL Survey dependencies
+        run: python -m pip install -r ocl_survey/requirements.txt
+
+      - name: Run OCL Survey reference strategy
+        if: matrix.strategy != 'skill_memory'
+        working-directory: ocl_survey
+        env:
+          PYTHONPATH: ${{ github.workspace }}/ocl_survey
+        run: |
+          python -m experiments.main \
+            strategy=${{ matrix.strategy }} \
+            experiment=split_cifar100 \
+            experiment.seed=${{ matrix.seed }} \
+            strategy.device=auto
+
+      - name: Run Avalanche Skill Memory plugin
+        if: matrix.strategy == 'skill_memory'
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/ocl_survey
+        run: |
+          python experiments/run_skill_memory_scientific.py \
+            --seed ${{ matrix.seed }} \
+            --ocl-root ocl_survey \
+            --output results/skill_memory_split_cifar100/${{ matrix.seed }}
+
+      - name: Collect reference result
+        if: matrix.strategy != 'skill_memory'
+        run: |
+          set -euo pipefail
+          source_dir=$(find ocl_survey/results -maxdepth 2 -type d -name "${{ matrix.strategy }}_split_cifar100*" | head -n 1)
+          test -n "$source_dir"
+          mkdir -p "results/${{ matrix.strategy }}_split_cifar100/${{ matrix.seed }}"
+          cp -a "$source_dir/${{ matrix.seed }}/." "results/${{ matrix.strategy }}_split_cifar100/${{ matrix.seed }}/"
+
+      - name: Record provenance
+        if: always()
+        run: |
+          mkdir -p "results/${{ matrix.strategy }}_split_cifar100/${{ matrix.seed }}"
+          {
+            echo "comparison_commit=$(git rev-parse HEAD)"
+            echo "ocl_survey_commit=33dd65fedbbd8514d43ae03beb698221aef2f16f"
+            echo "strategy=${{ matrix.strategy }}"
+            echo "seed=${{ matrix.seed }}"
+            echo "python=$(python --version)"
+          } > "results/${{ matrix.strategy }}_split_cifar100/${{ matrix.seed }}/provenance.txt"
+
+      - name: Upload seed result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-${{ matrix.strategy }}-seed-${{ matrix.seed }}
+          path: results/${{ matrix.strategy }}_split_cifar100/${{ matrix.seed }}
+          if-no-files-found: error
+          retention-days: 30
+
+  collect:
+    name: Consolidate scientific results
+    if: ${{ needs.benchmark.result == 'success' }}
+    needs: benchmark
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: scientific-*-seed-*
+          path: artifacts
+          merge-multiple: false
+
+      - name: Build comparison result tree
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          for artifact in artifacts/scientific-*-seed-*; do
+            name="${artifact##*/scientific-}"
+            strategy="${name%-seed-*}"
+            seed="${name##*-}"
+            mkdir -p "results/${strategy}_split_cifar100/${seed}"
+            cp -a "$artifact/." "results/${strategy}_split_cifar100/${seed}/"
+          done
+          find results -maxdepth 3 -type f -print
+
+      - name: Upload consolidated results
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-comparison-results
+          path: results
+          if-no-files-found: error
+          retention-days: 30

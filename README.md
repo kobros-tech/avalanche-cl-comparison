@@ -1,161 +1,55 @@
 # Avalanche CL Strategy Comparison + Skill Memory
 
-Compares the classic Continual Learning (CL) strategy families implemented
-in [Avalanche](https://github.com/ContinualAI/avalanche) — regularization,
-replay, and architectural/parameter-isolation methods — against a new
-demo strategy, **Skill Memory**, proposed in
-[`skill_memory_algorithm.md`](https://github.com/kobros-tech/avalanche/blob/feature/skill-memory-prototype/docs/skill_memory_algorithm.md)
-(kobros-tech's fork of Avalanche).
+This repository is the research-facing comparison harness for the Avalanche Skill Memory integration. It is no longer intended to be a toy/demo benchmark.
 
-## Quickstart
+## Scientific protocol
 
-```bash
-pip install -r requirements.txt
-jupyter notebook notebooks/00_setup_and_benchmark.ipynb
-```
+The primary experiment follows the protocol used in the OCL Survey comparison work:
 
-Run the notebooks in order (`00` → `06`); each of `01`–`05` writes a
-`results/*.csv` file that `06_comparison_dashboard.ipynb` aggregates.
-They can also be run independently/out of order — each rebuilds its own
-benchmark from the same seed.
+- Split CIFAR-100
+- 20 class-incremental experiences
+- replay memory size 2000 for reference replay methods
+- five independent seeds: 0, 1, 2, 3, 4
+- Python 3.11
+- Avalanche 0.6.0
+- CPU/GPU selected automatically by the workflow
+- results retained as per-seed artifacts with provenance
 
-## Notebooks
+The established reference strategies are executed from a pinned OCL Survey revision rather than reimplemented as toy versions in this repository: ER, ER-ACE, DER++, MIR, ER+LwF, RAR, SCR, A-GEM, MER, iCaRL, and GDumb. Skill Memory is evaluated using the Avalanche `SupervisedPlugin` implementation in `src/skill_memory/avalanche_plugin.py`.
 
-| # | Notebook | Strategies |
-|---|----------|-----------|
-| 00 | `00_setup_and_benchmark` | Environment check, benchmark exploration (PCA plot) |
-| 01 | `01_baselines` | Naive, Cumulative, JointTraining |
-| 02 | `02_regularization_strategies` | EWC, Synaptic Intelligence, LwF |
-| 03 | `03_replay_strategies` | Replay, GEM, A-GEM, GDumb, **ER-ACE** |
-| 04 | `04_architectural_strategies` | CWR\*, (AR1 noted but skipped — see below) |
-| 05 | `05_skill_memory_demo` | **Skill Memory** (new): 3-level validation |
-| 06 | `06_comparison_dashboard` | Aggregated comparison table + plots |
+The comparison is deliberately multi-seed. A strategy is not included in the primary aggregate table until all five requested seeds are available.
 
-## Why a synthetic benchmark?
+## Reproducible workflow
 
-This project runs fully offline. `src/bench_utils.py` builds a small,
-fast, in-memory class-incremental benchmark (Gaussian blobs per class,
-split into disjoint-class experiences via Avalanche's own `nc_benchmark`)
-instead of downloading MNIST/CIFAR/ImageNet. Every notebook only depends
-on the resulting object having `.train_stream` / `.test_stream` /
-`.n_classes` / `.feature_dim`, so swapping in a real dataset (e.g.
-`avalanche.benchmarks.SplitMNIST(n_experiences=5)`) is a one-line change
-— see `make_split_mnist_benchmark()` in `bench_utils.py`.
+Run `.github/workflows/scientific-comparison.yml` from GitHub Actions. It creates a matrix over all reference strategies and seeds, runs Skill Memory through `experiments/run_skill_memory_scientific.py`, records provenance, and uploads a consolidated result artifact.
 
-`src/skill_memory/synthetic_benchmark.py` is a second, independent
-benchmark module used only by notebook 00 (basic exploration) and — via
-its `make_transfer_demo_benchmark()` — internally by the Skill Memory
-Level 2 experiment logic in notebook 05, which needs *repeated/perturbed*
-classes across experiences (something Avalanche's `nc_benchmark` disjoint
-class-incremental split can't produce) to demonstrate REUSE/CLONE
-decisions with a known ground truth.
+The workflow pins OCL Survey to commit `a0ecf4eb537bbe704598f1f423a52d0ca9d48a0f`, the revision containing the corrected result-processing/notebook work used as the reference for this comparison.
 
-## What's *not* included, and why
+## Research notebooks
 
-- **Real datasets.** No network access to torchvision's dataset mirrors
-  in this environment. All results here are on the synthetic benchmark;
-  treat relative strategy rankings as illustrative, not as reproductions
-  of published numbers.
-- **AR1** is built around a convolutional feature extractor and doesn't
-  have a sane default for flat feature-vector data, so notebook 04 notes
-  the mismatch rather than forcing it onto data it wasn't designed for.
-- **iCaRL, DER, MIR, RAR, SCR** — strong additional replay/rehearsal
-  variants — are implemented in
-  [`AlbinSou/ocl_survey`](https://github.com/AlbinSou/ocl_survey) (the
-  code release for *"A Comprehensive Empirical Evaluation on Online
-  Continual Learning,"* ICCVW 2023) but weren't ported here given the
-  scope of this project. That repo is also a good source of literature
-  hyperparameters (`config/best_configs/`) if you scale this project up
-  to real datasets.
+| Notebook | Purpose |
+|---|---|
+| `05_skill_memory_scientific.ipynb` | Five-seed Skill Memory analysis: final accuracy, causal forgetting, and acquisition decisions |
+| `06_scientific_comparison.ipynb` | Aggregate every strategy from its own workflow artifacts and plot mean/std across seeds |
 
-## Skill Memory (the new strategy)
+The older demo and synthetic notebooks are retained only as development/history material; they are not the source of the scientific comparison numbers.
 
-Implemented in `src/skill_memory/`:
+## Evaluation discipline
 
-- `registry.py` — a `SkillMemory` that stores independent, **provably
-  immutable** skill instances (deep-copied state dicts; a skill's stored
-  weights can never change as a side effect of training a later skill).
-- `scoring.py` — compatibility scoring: how well does a stored skill
-  already do on a probe split of the *new* experience's training data
-  (never test/eval data), relative to a fresh reference model?
-- `policy.py` — the REUSE / CLONE / SCRATCH decision: estimate each
-  action's outcome under a matched probe budget, and pick SCRATCH unless
-  REUSE or CLONE genuinely beats it.
-- `strategy.py` — `SkillMemoryStrategy`, a standalone orchestrator that
-  runs the full algorithm against an Avalanche benchmark's experience
-  streams (steps 1–10 of the spec's Section 3).
-- `plugin.py` — a **not-yet-functional** sketch of how this would become
-  a real `avalanche.core.SupervisedPlugin`, documenting the specific
-  integration gap (no clean way to skip `optimizer.step()` for REUSE in
-  Avalanche's current plugin hooks) worth raising upstream before
-  finishing that path.
+The primary Skill Memory metric is **active-model** retention. The plugin's evaluation hooks may perform labeled probe retrieval for diagnostic experiments, but that oracle-routing behavior is intentionally excluded from the primary apples-to-apples table.
 
-`tests/test_skill_memory.py` contains the Level-1 "mechanism validity"
-unit tests (immutability, capacity limits, clone/source divergence,
-REUSE never registering a new skill, etc.) — run with:
+Forgetting is computed causally: for each task, the best accuracy observed before the final measurement is compared with the final accuracy. Future observations are never used to define the past maximum.
 
-```bash
-python -m pytest tests/ -v
-```
+All raw per-seed outputs remain available as workflow artifacts, including Skill Memory's **REUSE/SCRATCH decisions** and probe diagnostics. This makes it possible to audit a surprising result rather than relying only on an aggregate number.
 
-`notebooks/05_skill_memory_demo.ipynb` runs three levels of validation
-end to end, matching the spec's own suggested testing structure:
+## Skill Memory implementation
 
-1. **Mechanism validity** — the same invariants as the unit tests, shown live.
-2. **Oracle transfer check** — two experiences built to share the same
-   underlying task; under a matched (tight) probe budget, the policy
-   should (and does) pick REUSE over SCRATCH.
-3. **Automatic policy on the shared benchmark** — run against the same
-   disjoint-class benchmark every other notebook uses. Since classes
-   never repeat there, the policy correctly falls back to SCRATCH every
-   time — that's the spec-compliant behavior, not a bug.
+`src/skill_memory/avalanche_plugin.py` contains the exact Avalanche integration under evaluation. It provides immutable stored skill snapshots, classifier resizing on restoration, probe-based compatibility measurements, dynamic gap-based skill selection with a forgetting guard, REUSE/SCRATCH acquisition, optimizer reset on restoration, and bounded skill registration.
 
-### Known limitation, called out explicitly
+There are **no fixed reuse/clone thresholds** in the scientific implementation. Skill selection is determined by the stored implementation's probe-based imagination procedure: the forgetting guard, largest-gap clustering, automatically derived floor, and joint score/accuracy candidate selection.
 
-Skill Memory as specified only defines the **training-time acquisition**
-policy — not how to route a test example to the right stored skill at
-**inference time** without an oracle task ID. Notebook 05's final
-comparison uses a simple `class → skill_id` lookup table built from what
-was learned during training, which only works because this specific demo
-benchmark has disjoint classes. Real class-incremental inference (no
-task ID at test time) would need Skill Memory's own inference-time
-policy, which the current spec doesn't cover — a good next question to
-raise with the spec's authors before comparing accuracy numbers as truly
-apples-to-apples with the other strategies in the dashboard.
+The implementation should be treated as experimental research code: the scientific workflow is designed to expose its behavior against established continual-learning baselines, not to assume that Skill Memory wins.
 
-## Repo layout
+## Reference
 
-```
-requirements.txt
-notebooks/
-  00_setup_and_benchmark.ipynb
-  01_baselines.ipynb
-  02_regularization_strategies.ipynb
-  03_replay_strategies.ipynb
-  04_architectural_strategies.ipynb
-  05_skill_memory_demo.ipynb
-  06_comparison_dashboard.ipynb
-src/
-  bench_utils.py          # canonical shared benchmark (notebooks 01-06)
-  run_utils.py             # shared train/eval loop + result-row helper
-  cl_bench/
-    er_ace.py               # ER-ACE, ported from AlbinSou/ocl_survey
-  skill_memory/
-    registry.py, scoring.py, policy.py, strategy.py, plugin.py
-    synthetic_benchmark.py  # used by notebook 00 + Skill Memory's Level 2 demo
-tests/
-  test_skill_memory.py     # Level-1 mechanism validity tests
-results/                   # *.csv + *.png written by the notebooks
-```
-
-## Contributing this upstream
-
-If you want to take Skill Memory further toward an actual Avalanche PR:
-
-1. Read `src/skill_memory/plugin.py`'s docstring — it documents the
-   specific `SupervisedPlugin` hook points needed and the one concrete
-   gap in Avalanche's current plugin API (skipping the optimizer step for
-   REUSE) that's worth opening an issue about first.
-2. The inference-time routing problem noted above is the other open
-   design question worth raising with the `kobros-tech` branch's authors
-   before finalizing a benchmark comparison.
+The scientific comparison and result-processing protocol are based on the work in `kobros-tech/ocl_survey`, including its Split CIFAR-100 five-seed comparison notebook and corrected causal forgetting calculation.

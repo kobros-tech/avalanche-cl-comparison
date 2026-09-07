@@ -1,0 +1,45 @@
+benchmark:
+  name: split_cifar100
+  experiences: 20
+  class_incremental: true
+  validation_fraction: 0.05
+  memory_size: 2000
+
+replicates:
+  seeds: [0, 1, 2, 3, 4]
+
+runtime:
+  python: "3.11"
+  avalanche: "0.6.0"
+  device: auto
+
+reference_implementation:
+  repository: kobros-tech/ocl_survey
+  commit: a0ecf4eb537bbe704598f1f423a52d0ca9d48a0f
+  strategies:
+    - er
+    - er_ace
+    - der
+    - mir
+    - er_lwf
+    - rar
+    - scr
+    - agem
+    - mer
+    - icarl
+    - gdumb
+
+skill_memory:
+  implementation: src/skill_memory/avalanche_plugin.py
+  source: kobros-tech/ocl_survey/src/strategies/skill_memory.py
+  source_sha: 35dc4b9355255d961deb621ebf9926a4aa55b8ac
+  probe_batch_size: 64
+  probe_batches: 5
+  score_floor: null
+  forgetting_margin: 0.05
+  decision: dynamic_imagination_gap_clustering
+  evaluation_mode: active_model_no_retrieval
+
+primary_metrics:
+  - final_test_accuracy
+  - causal_average_forgetting
